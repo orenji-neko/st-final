@@ -1,13 +1,8 @@
-import { useEffect, useState } from "react";
 import { Person } from "./generated/prisma/client";
 import prisma from "@/lib/prisma";
 
-export default function Home() {
-  const [persons, setPersons] = useState<Person[]>();
+export default async function Home() {
+  const persons: Person[] = await prisma.person.findMany();
 
-  useEffect(() => {
-    prisma.person.findMany().then((data) => setPersons(data));
-  }, []);
-
-  return <></>;
+  return <>{persons && persons.map((p) => <p key={p.id}>{p.name}</p>)}</>;
 }
