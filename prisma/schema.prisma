@@ -11,12 +11,18 @@ datasource db {
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
-  password  String   // This will store the hashed password
+  password  String // hashed password
   name      String?
+  role      Role     @default(USER)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   sessions Session[]
+}
+
+enum Role {
+  USER
+  ADMIN
 }
 
 model Session {

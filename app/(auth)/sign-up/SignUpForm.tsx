@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { InputGroup } from "@/components/ui/input-group";
-import { signup } from "../actions/auth";
+import { signup } from "../../actions/auth";
 
 const signUpSchema = z
   .object({
