@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { updateUser, getUser, SafeUser } from "@/app/actions/user";
 import {
   Dialog,
@@ -11,8 +14,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -20,6 +30,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+const formSchema = z.object({
+  name: z.string().min(1, {
+    message: "Name is required.",
+  }),
+  email: z.email({
+    message: "Please enter a valid email address.",
+  }),
+  password: z
+    .string()
+    .min(6, {
+      message: "Password must be at least 6 characters.",
+    })
+    .optional()
+    .or(z.literal("")),
+  role: z.enum(["USER", "ADMIN"]),
+});
 
 interface EditUserModalProps {
   isOpen: boolean;
@@ -34,14 +61,16 @@ export default function EditUserModal({
   onUserUpdated,
   userId,
 }: EditUserModalProps) {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<SafeUser | null>(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    password: "",
-    role: "USER" as "USER" | "ADMIN",
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+      role: "USER",
+    },
   });
 
   useEffect(() => {
@@ -50,54 +79,41 @@ export default function EditUserModal({
         try {
           const userData = await getUser(userId);
           setUser(userData);
-          setFormData({
+          form.reset({
             name: userData.name || "",
             email: userData.email,
             password: "",
             role: userData.role,
           });
-        } catch {
-          setError("Failed to load user data");
+        } catch (error) {
+          console.error("Failed to load user data:", error);
         }
       };
       fetchUser();
     }
-  }, [isOpen, userId]);
+  }, [isOpen, userId, form]);
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    setError(null);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!userId || !formData.name || !formData.email) {
-      setError("Name and email are required");
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!userId) return;
 
     try {
-      const data = new FormData();
-      data.append("name", formData.name);
-      data.append("email", formData.email);
-      data.append("role", formData.role);
-      if (formData.password) {
-        data.append("password", formData.password);
+      const formData = new FormData();
+      formData.append("name", values.name);
+      formData.append("email", values.email);
+      formData.append("role", values.role);
+
+      // Only append password if provided and not empty
+      if (values.password && values.password.trim() !== "") {
+        formData.append("password", values.password);
       }
 
-      await updateUser(userId, data);
+      await updateUser(userId, formData);
       onUserUpdated();
       onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setIsLoading(false);
+    } catch (error) {
+      console.error("Failed to update user:", error);
     }
-  };
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -109,85 +125,91 @@ export default function EditUserModal({
             password.
           </DialogDescription>
         </DialogHeader>
-
         {user ? (
-          <form onSubmit={handleSubmit}>
-            <div className="grid gap-4 py-4">
-              {error && (
-                <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md">
-                  {error}
-                </div>
-              )}
-
-              <div className="grid gap-2">
-                <Label htmlFor="edit-name">Full Name</Label>
-                <Input
-                  id="edit-name"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange("name", e.target.value)}
-                  placeholder="Enter full name"
-                  required
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="edit-email">Email Address</Label>
-                <Input
-                  id="edit-email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => handleInputChange("email", e.target.value)}
-                  placeholder="Enter email address"
-                  required
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="edit-password">New Password</Label>
-                <Input
-                  id="edit-password"
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) =>
-                    handleInputChange("password", e.target.value)
-                  }
-                  placeholder="Leave blank to keep current password"
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="edit-role">Role</Label>
-                <Select
-                  value={formData.role}
-                  onValueChange={(value: "USER" | "ADMIN") =>
-                    handleInputChange("role", value)
-                  }
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Full Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter full name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter email address" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>New Password</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="Leave blank to keep current password"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Role</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a role" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="USER">User</SelectItem>
+                        <SelectItem value="ADMIN">Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onClose}
+                  disabled={form.formState.isSubmitting}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="USER">User</SelectItem>
-                    <SelectItem value="ADMIN">Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onClose}
-                disabled={isLoading}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? "Updating..." : "Update User"}
-              </Button>
-            </DialogFooter>
-          </form>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={form.formState.isSubmitting}>
+                  {form.formState.isSubmitting ? "Updating..." : "Update User"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         ) : (
           <div className="py-8 text-center">
             <div className="text-muted-foreground">Loading user data...</div>
