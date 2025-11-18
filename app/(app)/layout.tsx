@@ -1,5 +1,5 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import AppSidebar from "@/components/server/AppSidebar";
+import AppSidebar from "@/components/AppSidebar";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
@@ -16,7 +16,7 @@ export default async function AppLayout({
 
   return (
     <SidebarProvider>
-      <div className="flex h-screen">
+      <div className="flex h-screen w-full">
         <AppSidebar />
         <main className="flex-1 flex flex-col overflow-hidden">
           <header className="h-14 border-b flex items-center px-4 bg-background">
